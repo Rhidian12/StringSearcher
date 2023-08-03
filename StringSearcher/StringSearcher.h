@@ -6,7 +6,7 @@
 #include <vector>
 #include <unordered_map>
 
-#ifndef RDW_STRINGSEARCHER_H
+#ifndef RDW_STRINGSEARCHER_H // not every compiler supports #pragma once
 #define RDW_STRINGSEARCHER_H
 
 namespace RDW_SS
@@ -44,6 +44,8 @@ namespace RDW_SS
 					foundMatch = true;
 					foundStrings[fileToLookThrough].push_back(lineNumber);
 				}
+
+				++lineNumber;
 			}
 
 			stream.close();

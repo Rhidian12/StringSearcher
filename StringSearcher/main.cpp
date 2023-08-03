@@ -1,5 +1,6 @@
 #include "StringSearcher.h"
 
+#include <chrono>
 #include <filesystem>
 #include <string>
 
@@ -68,8 +69,11 @@ namespace RDW_SS
 
 int main(int argc, char* argv[])
 {
-	const uint8_t MIN_NR_OF_ARGS{ 2 };
-	const uint8_t MAX_NR_OF_ARGS{ 6 };
+	using clock = std::chrono::high_resolution_clock;
+	clock::time_point start{ clock::now() };
+
+	constexpr uint8_t MIN_NR_OF_ARGS{ 2 };
+	constexpr uint8_t MAX_NR_OF_ARGS{ 6 };
 
 	if (!(argc >= MIN_NR_OF_ARGS && argc <= MAX_NR_OF_ARGS))
 	{
@@ -117,6 +121,8 @@ int main(int argc, char* argv[])
 	{
 		std::cout << "No occurences found!";
 	}
+
+	std::cout << "Finished in " << std::chrono::duration_cast<std::chrono::seconds>(clock::now() - start).count() << " seconds\n";
 
 	return 0;
 }
