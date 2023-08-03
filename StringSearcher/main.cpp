@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
 		std::cout << "No occurences found!";
 	}
 
-	std::cout << "Finished in " << std::chrono::duration_cast<std::chrono::seconds>(clock::now() - start).count() << " seconds\n";
+	std::cout << "Finished in " << std::chrono::duration_cast<std::chrono::milliseconds>(clock::now() - start).count() << " milliseconds\n";
 
 	return 0;
 }
