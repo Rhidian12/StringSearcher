@@ -1,8 +1,5 @@
-#include <algorithm>
 #include <assert.h>
-#include <filesystem>
 #include <fstream>
-#include <functional>
 #include <iostream>
 #include <mutex>
 #include <stack>
@@ -229,7 +226,6 @@ namespace RDW_SS
 	{
 		if (recursivelySearch)
 		{
-			// use half of the threads
 			const size_t nrOfThreads{ std::thread::hardware_concurrency() };
 			const std::vector<std::string> allFiles{ Detail::GetAllFilesInDirectory(currentDir, fileToLookThrough) };
 			const size_t nrOfFilesPerThread{ allFiles.size() / nrOfThreads };
@@ -251,7 +247,7 @@ namespace RDW_SS
 
 				nrOfFilesAdded += endOffset - startOffset;
 #ifdef _DEBUG
-				{ // destroys debug performance but we dont care l o l
+				{ // destroys debug performance but we dont care lol
 					auto testFileSizes = std::vector<std::string>{ allFiles.begin() + startOffset, allFiles.begin() + endOffset };
 					assert(testFileSizes.size() == nrOfFilesPerThread);
 				}
