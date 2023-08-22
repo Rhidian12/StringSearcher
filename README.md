@@ -1,9 +1,9 @@
 # StringSearcher
 
-StringSearcher is a command-line tool loosely based on findstr (Windows).
+StringSearcher is a (Windows-only) command-line tool loosely based on findstr (Windows).
 
 ### Usage
-It is meant as a Command line tool, but all functionality is contained in the StringSearcher header, which can be included in any C++ project (C++17 is required).
+It is meant as a Command line tool, but all functionality is contained in the StringSearcher header, which can be included in any C++ project.
 
 Command line options:
 /s    ->    Searches current directory and sub-directories
