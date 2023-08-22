@@ -4,6 +4,7 @@ StringSearcher is a (Windows-only) command-line tool loosely based on findstr (W
 
 ### Usage
 It is meant as a Command line tool, but all functionality is contained in the StringSearcher header, which can be included in any C++ project.
+This tool is basically as fast as findstr on Windows
 
 Command line options:
 /s    ->    Searches current directory and sub-directories
@@ -14,3 +15,4 @@ Command line options:
 ### Future Work
 - Add Regex support
 - Make it faster
+- Add timing information
