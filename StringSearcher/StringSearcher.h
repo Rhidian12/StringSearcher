@@ -5,6 +5,7 @@
 #include <functional>
 #include <iostream>
 #include <mutex>
+#include <stack>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -95,32 +96,44 @@ namespace RDW_SS
 			}
 		}
 
-		inline static std::vector<std::string> GetAllFilesInDirectory(const std::string& rootDir, const std::string& filterName,
-			const std::string& filterExtension, const bool isWildcardName, const bool isWildcardExtension)
+		inline static std::vector<std::string> GetAllFilesInDirectory(const std::string& rootDir, const std::string& filterFile)
 		{
-			const std::filesystem::path directory{ rootDir };
-			std::vector<std::string> fileNames{};
+			std::vector<std::string> files{};
+			files.reserve(80);
 
-			// reserve some memory for all of the files/directories in the directory
-			fileNames.reserve(50);
+			std::stack<std::string> fileStack{};
+			fileStack.push(rootDir);
 
-			for (const std::filesystem::path& path : std::filesystem::directory_iterator(directory))
+			const std::string filterFilename{ filterFile.substr(0, filterFile.find(".")) };
+			const std::string filterExtension{ filterFile.substr(filterFile.find(".")) };
+			const bool isWildcardName{ filterFilename == "*" };
+			const bool isWildcardExtension{ filterExtension == "*" };
+
+			while (!fileStack.empty())
 			{
-				if (std::filesystem::is_directory(path))
-				{
-					const std::vector namesInDir{ GetAllFilesInDirectory(path.string(), filterName, filterExtension, isWildcardName, isWildcardExtension) };
-					fileNames.insert(fileNames.end(), namesInDir.begin(), namesInDir.end());
-				}
-				else if (std::filesystem::is_regular_file(path))
-				{
-					if (isWildcardName && filterName != path.filename().string()) continue;
-					if (isWildcardExtension && filterExtension != path.extension().string()) continue;
+				const std::string child{ fileStack.top() };
+				fileStack.pop();
 
-					fileNames.emplace_back(path.string());
+				if (std::filesystem::is_directory(child))
+				{
+					for (const std::filesystem::path& path : std::filesystem::directory_iterator(child))
+					{
+						fileStack.push(path.string());
+					}
+				}
+				else if (std::filesystem::is_regular_file(child))
+				{
+					const size_t dotPos{ child.find_last_of(".") };
+					if (!isWildcardName && filterFilename != child.substr(0, dotPos)) continue;
+
+					// files don't *have* to have an extension
+					if (!isWildcardExtension && dotPos != std::string::npos && filterExtension != child.substr(dotPos)) continue;
+
+					files.push_back(child);
 				}
 			}
 
-			return fileNames;
+			return files;
 		}
 	}
 
@@ -131,11 +144,7 @@ namespace RDW_SS
 		{
 			// use half of the threads
 			const size_t nrOfThreads{ std::thread::hardware_concurrency() };
-			const std::string filterFilename{ fileToLookThrough.substr(0, fileToLookThrough.find(".")) };
-			const std::string filterExtension{ fileToLookThrough.substr(fileToLookThrough.find(".")) };
-
-			const std::vector<std::string> allFiles{ Detail::GetAllFilesInDirectory(currentDir, filterFilename, filterExtension,
-				filterFilename == "*", filterExtension == "*") };
+			const std::vector<std::string> allFiles{ Detail::GetAllFilesInDirectory(currentDir, fileToLookThrough) };
 			const size_t nrOfFilesPerThread{ allFiles.size() / nrOfThreads };
 
 			if (nrOfFilesPerThread == 0) return;
@@ -147,18 +156,14 @@ namespace RDW_SS
 
 			using FuncType = void(const std::vector<std::string>&, std::string, const bool, std::unordered_map<std::string, std::vector<uint32_t>>&, std::mutex&);
 
-#ifdef _DEBUG
-			size_t counter = 0;
-#endif
-
+			size_t nrOfFilesAdded{};
 			for (size_t i{}; i < nrOfThreads - 1; ++i)
 			{
 				const size_t startOffset{ nrOfFilesPerThread * i };
 				const size_t endOffset{ nrOfFilesPerThread * (i + 1) };
 
+				nrOfFilesAdded += endOffset - startOffset;
 #ifdef _DEBUG
-				counter += endOffset - startOffset;
-
 				{ // destroys debug performance but we dont care l o l
 					auto testFileSizes = std::vector<std::string>{ allFiles.begin() + startOffset, allFiles.begin() + endOffset };
 					assert(testFileSizes.size() == nrOfFilesPerThread);
@@ -168,13 +173,12 @@ namespace RDW_SS
 				threads.emplace_back(static_cast<FuncType*>(&Detail::IsStringInFile), std::vector<std::string>{ allFiles.begin() + startOffset, allFiles.begin() + endOffset }, stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
 			}
 
-#ifdef _DEBUG
-			if (evenNumberOfFiles) assert(counter == allFiles.size() - nrOfFilesPerThread);
-			else assert(counter == allFiles.size() - nrOfFilesPerThread - 1);
-#endif
+			threads.emplace_back(static_cast<FuncType*>(&Detail::IsStringInFile), std::vector<std::string>{ allFiles.begin() + nrOfFilesAdded, allFiles.end() }, stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
+			nrOfFilesAdded += std::distance(allFiles.begin() + nrOfFilesAdded, allFiles.end());
 
-			if (evenNumberOfFiles) threads.emplace_back(static_cast<FuncType*>(&Detail::IsStringInFile), std::vector<std::string>{ allFiles.begin() + allFiles.size() - nrOfFilesPerThread, allFiles.end() }, stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
-			else threads.emplace_back(static_cast<FuncType*>(&Detail::IsStringInFile), std::vector<std::string>{ allFiles.begin() + allFiles.size() - nrOfFilesPerThread - 1, allFiles.end() }, stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
+#ifdef _DEBUG
+			assert(nrOfFilesAdded == allFiles.size());
+#endif
 
 			for (size_t i{}; i < nrOfThreads; ++i) threads[i].join();
 		}
