@@ -10,6 +10,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <Windows.h>
 
 #ifndef RDW_STRINGSEARCHER_H // not every compiler supports #pragma once
 #define RDW_STRINGSEARCHER_H
@@ -96,10 +97,78 @@ namespace RDW_SS
 			}
 		}
 
+		inline static bool IsFilenameValid(char* pFilename, const std::string& filenameFilter)
+		{
+			if (filenameFilter == "*") return true;
+
+			bool isFilenameValid{ true };
+			for (size_t i{}; i < MAX_PATH; ++i)
+			{
+				if (pFilename[i] == '\0' || pFilename[i] == '.') break;
+
+				if (i >= filenameFilter.size())
+				{
+					isFilenameValid = false;
+					break;
+				}
+
+				if (pFilename[i] != filenameFilter[i])
+				{
+					isFilenameValid = false;
+					break;
+				}
+			}
+
+			return isFilenameValid;
+		}
+
+		inline static bool IsExtensionValid(char* pFilename, const std::string& extensionFilter)
+		{
+			if (extensionFilter == "*") return true;
+
+			{
+				bool hasExtension{};
+				for (size_t i{}; i < MAX_PATH; ++i)
+				{
+					if (*pFilename != '.') ++pFilename;
+					else
+					{
+						hasExtension = true;
+						break;
+					}
+				}
+
+				if (!hasExtension) return false;
+			}
+
+			bool isExtensionValid{ true };
+			for (size_t i{}; i < MAX_PATH; ++i)
+			{
+				if (pFilename[i] == '\0') break;
+
+				if (i >= extensionFilter.size())
+				{
+					isExtensionValid = false;
+					break;
+				}
+
+				if (pFilename[i] != extensionFilter[i])
+				{
+					isExtensionValid = false;
+					break;
+				}
+			}
+
+			return isExtensionValid;
+		}
+
 		inline static std::vector<std::string> GetAllFilesInDirectory(const std::string& rootDir, const std::string& filterFile)
 		{
 			std::vector<std::string> files{};
 			files.reserve(80);
+
+			WIN32_FIND_DATAA findFileData;
+			HANDLE fileHandle = INVALID_HANDLE_VALUE;
 
 			std::stack<std::string> fileStack{};
 			fileStack.push(rootDir);
@@ -114,24 +183,36 @@ namespace RDW_SS
 				const std::string child{ fileStack.top() };
 				fileStack.pop();
 
-				if (std::filesystem::is_directory(child))
+				fileHandle = FindFirstFileA((child + "\\*").c_str(), &findFileData);
+				if (fileHandle == INVALID_HANDLE_VALUE)
 				{
-					for (const std::filesystem::path& path : std::filesystem::directory_iterator(child))
+					std::cout << "FindFirstFile failed on file" << child << "\n";
+					return std::vector<std::string>{};
+				}
+
+				do
+				{
+					if (strcmp(findFileData.cFileName, ".") == 0 ||
+						strcmp(findFileData.cFileName, "..") == 0)
 					{
-						fileStack.push(path.string());
+						continue;
 					}
-				}
-				else if (std::filesystem::is_regular_file(child))
-				{
-					const size_t dotPos{ child.find_last_of(".") };
-					if (!isWildcardName && filterFilename != child.substr(0, dotPos)) continue;
 
-					// files don't *have* to have an extension
-					if (!isWildcardExtension && dotPos != std::string::npos && filterExtension != child.substr(dotPos)) continue;
-
-					files.push_back(child);
-				}
+					if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+					{
+						fileStack.push(child + "\\" + findFileData.cFileName);
+					}
+					else
+					{
+						if (IsFilenameValid(findFileData.cFileName, filterFilename) && IsExtensionValid(findFileData.cFileName, filterExtension))
+						{
+							files.push_back(child + "\\" + findFileData.cFileName);
+						}
+					}
+				} while (FindNextFileA(fileHandle, &findFileData) != 0);
 			}
+
+			FindClose(fileHandle);
 
 			return files;
 		}
