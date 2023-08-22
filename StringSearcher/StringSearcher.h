@@ -95,7 +95,8 @@ namespace RDW_SS
 			}
 		}
 
-		inline static std::vector<std::string> GetAllFilesInDirectory(const std::string& rootDir, const std::string& fileToLookThrough)
+		inline static std::vector<std::string> GetAllFilesInDirectory(const std::string& rootDir, const std::string& filterName,
+			const std::string& filterExtension, const bool isWildcardName, const bool isWildcardExtension)
 		{
 			const std::filesystem::path directory{ rootDir };
 			std::vector<std::string> fileNames{};
@@ -103,25 +104,17 @@ namespace RDW_SS
 			// reserve some memory for all of the files/directories in the directory
 			fileNames.reserve(50);
 
-			std::string filename{};
-			std::string extension{};
-			if (!fileToLookThrough.empty())
-			{
-				filename = fileToLookThrough.substr(0, fileToLookThrough.find("."));
-				extension = fileToLookThrough.substr(fileToLookThrough.find("."));
-			}
-
 			for (const std::filesystem::path& path : std::filesystem::directory_iterator(directory))
 			{
 				if (std::filesystem::is_directory(path))
 				{
-					const std::vector namesInDir{ GetAllFilesInDirectory(path.string(), fileToLookThrough) };
+					const std::vector namesInDir{ GetAllFilesInDirectory(path.string(), filterName, filterExtension, isWildcardName, isWildcardExtension) };
 					fileNames.insert(fileNames.end(), namesInDir.begin(), namesInDir.end());
 				}
 				else if (std::filesystem::is_regular_file(path))
 				{
-					if (filename != "*" && filename != path.filename().string()) continue;
-					if (extension != "*" && extension != path.extension().string()) continue;
+					if (isWildcardName && filterName != path.filename().string()) continue;
+					if (isWildcardExtension && filterExtension != path.extension().string()) continue;
 
 					fileNames.emplace_back(path.string());
 				}
@@ -138,7 +131,11 @@ namespace RDW_SS
 		{
 			// use half of the threads
 			const size_t nrOfThreads{ std::thread::hardware_concurrency() };
-			const std::vector<std::string> allFiles{ Detail::GetAllFilesInDirectory(currentDir, fileToLookThrough) };
+			const std::string filterFilename{ fileToLookThrough.substr(0, fileToLookThrough.find(".")) };
+			const std::string filterExtension{ fileToLookThrough.substr(fileToLookThrough.find(".")) };
+
+			const std::vector<std::string> allFiles{ Detail::GetAllFilesInDirectory(currentDir, filterFilename, filterExtension,
+				filterFilename == "*", filterExtension == "*") };
 			const size_t nrOfFilesPerThread{ allFiles.size() / nrOfThreads };
 
 			if (nrOfFilesPerThread == 0) return;
