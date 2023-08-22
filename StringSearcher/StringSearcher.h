@@ -218,8 +218,14 @@ namespace RDW_SS
 		}
 	}
 
+	struct StringSearchStatistics final
+	{
+		int32_t NumberOfFilesSearched;
+	};
+
 	inline static void IsStringInFile(const std::string& currentDir, const std::string& fileToLookThrough, const std::string& stringToSearch,
-		const bool ignoreCase, const bool recursivelySearch, std::unordered_map<std::string, std::vector<uint32_t>>& foundStrings)
+		const bool ignoreCase, const bool recursivelySearch, std::unordered_map<std::string, std::vector<uint32_t>>& foundStrings,
+		StringSearchStatistics* pStatistics)
 	{
 		if (recursivelySearch)
 		{
@@ -262,6 +268,11 @@ namespace RDW_SS
 #endif
 
 			for (size_t i{}; i < nrOfThreads; ++i) threads[i].join();
+
+			if (pStatistics)
+			{
+				pStatistics->NumberOfFilesSearched = static_cast<int32_t>(nrOfFilesAdded);
+			}
 		}
 		else
 		{

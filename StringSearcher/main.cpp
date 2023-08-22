@@ -84,6 +84,7 @@ int main(int argc, char* argv[])
 
 	std::string stringToSearch{}, fileToLookThrough{}, currentDir{};
 	bool ignoreCase, recursivelySearch{};
+	RDW_SS::StringSearchStatistics statistics{};
 
 	RDW_SS::ParseCmdArgs(argc, argv, stringToSearch, fileToLookThrough, currentDir, ignoreCase, recursivelySearch);
 
@@ -100,11 +101,14 @@ int main(int argc, char* argv[])
 	}
 
 	std::unordered_map<std::string, std::vector<uint32_t>> foundStrings{};
-	RDW_SS::IsStringInFile(currentDir, fileToLookThrough, stringToSearch, ignoreCase, recursivelySearch, foundStrings);
+	RDW_SS::IsStringInFile(currentDir, fileToLookThrough, stringToSearch, ignoreCase, recursivelySearch, foundStrings, &statistics);
+
+	std::cout << "Searched through " << statistics.NumberOfFilesSearched << " files\n";
+
 	if (!foundStrings.empty())
 	{
 		size_t nrOfOccurences{};
-		std::for_each(foundStrings.cbegin(), foundStrings.cend(), [&nrOfOccurences](const auto& kvPair)->void {nrOfOccurences += kvPair.second.size(); });
+		std::for_each(foundStrings.cbegin(), foundStrings.cend(), [&nrOfOccurences](const auto& kvPair)->void { nrOfOccurences += kvPair.second.size(); });
 
 		std::cout << "Found " << nrOfOccurences << " of string search occurences across " << foundStrings.size() << " files\n";
 
