@@ -70,7 +70,7 @@ namespace RDW_SS
 int main(int argc, char* argv[])
 {
 	using clock = std::chrono::high_resolution_clock;
-	clock::time_point start{ clock::now() };
+	const clock::time_point start{ clock::now() };
 
 	constexpr uint8_t MIN_NR_OF_ARGS{ 2 };
 	constexpr uint8_t MAX_NR_OF_ARGS{ 6 };
@@ -83,8 +83,7 @@ int main(int argc, char* argv[])
 	}
 
 	std::string stringToSearch{}, fileToLookThrough{}, currentDir{};
-	bool ignoreCase, recursivelySearch{};
-	RDW_SS::StringSearchStatistics statistics{};
+	bool ignoreCase{}, recursivelySearch{};
 
 	RDW_SS::ParseCmdArgs(argc, argv, stringToSearch, fileToLookThrough, currentDir, ignoreCase, recursivelySearch);
 
@@ -100,6 +99,7 @@ int main(int argc, char* argv[])
 		fileToLookThrough = currentDir + "\\" + fileToLookThrough;
 	}
 
+	RDW_SS::StringSearchStatistics statistics{};
 	std::unordered_map<std::string, std::vector<uint32_t>> foundStrings{};
 	RDW_SS::IsStringInFile(currentDir, fileToLookThrough, stringToSearch, ignoreCase, recursivelySearch, foundStrings, &statistics);
 

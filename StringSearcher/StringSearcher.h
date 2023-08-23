@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <assert.h>
 #include <fstream>
 #include <iostream>
@@ -16,45 +17,17 @@ namespace RDW_SS
 {
 	namespace Detail
 	{
-		inline static void IsStringInFile(const std::string& fileToLookThrough, std::string stringToSearch, const bool ignoreCase,
-			std::unordered_map<std::string, std::vector<uint32_t>>& foundStrings)
+		inline static void TransformStringToLowercase(std::string& str)
 		{
-			std::ifstream stream{};
-
-			stream.open(fileToLookThrough);
-
-			if (!stream.is_open())
-			{
-				std::cout << "Could not open file: " << fileToLookThrough << "\n";
-				return;
-			}
-
-			const auto stringToLowercase = [](std::string& str)->void
-			{
-				std::transform(str.begin(), str.end(), str.begin(), [](char c) { return std::tolower(c); });
-			};
-
-			if (ignoreCase) stringToLowercase(stringToSearch);
-
-			uint32_t lineNumber{ 1 }; // Notepad++ starts counting at 1, so let's do the same
-			std::string line{};
-			while (std::getline(stream, line))
-			{
-				if (ignoreCase) stringToLowercase(line);
-
-				if (line.find(stringToSearch) != std::string::npos)
-				{
-					foundStrings[fileToLookThrough].push_back(lineNumber);
-				}
-
-				++lineNumber;
-			}
-
-			stream.close();
+			std::transform(str.begin(), str.end(), str.begin(), [](char c) { return std::tolower(c); });
 		}
 
-		inline static void IsStringInFile(const std::vector<std::string>& filesToLookThrough, std::string stringToSearch, const bool ignoreCase,
-			std::unordered_map<std::string, std::vector<uint32_t>>& foundStrings, std::mutex& mutex)
+		inline static void SearchFilesForString(
+			const std::vector<std::string>& filesToLookThrough,
+			std::string stringToSearch,
+			const bool ignoreCase,
+			std::unordered_map<std::string, std::vector<uint32_t>>& foundStrings,
+			std::mutex& mutex)
 		{
 			std::ifstream stream{};
 
@@ -68,26 +41,19 @@ namespace RDW_SS
 					return;
 				}
 
-				const auto stringToLowercase = [](std::string& str)->void
-				{
-					std::transform(str.begin(), str.end(), str.begin(), [](char c) { return std::tolower(c); });
-				};
+				if (ignoreCase) TransformStringToLowercase(stringToSearch);
 
-				if (ignoreCase) stringToLowercase(stringToSearch);
-
-				uint32_t lineNumber{ 1 }; // Notepad++ starts counting at 1, so let's do the same
+				// Notepad++ starts counting at 1, so let's do the same
 				std::string line{};
-				while (std::getline(stream, line))
+				for (uint32_t lineNumber{ 1 }; std::getline(stream, line); ++lineNumber)
 				{
-					if (ignoreCase) stringToLowercase(line);
+					if (ignoreCase) TransformStringToLowercase(line);
 
 					if (line.find(stringToSearch) != std::string::npos)
 					{
 						const std::lock_guard<std::mutex> lock{ mutex };
 						foundStrings[filename].push_back(lineNumber);
 					}
-
-					++lineNumber;
 				}
 
 				stream.close();
@@ -220,8 +186,13 @@ namespace RDW_SS
 		int32_t NumberOfFilesSearched;
 	};
 
-	inline static void IsStringInFile(const std::string& currentDir, const std::string& fileToLookThrough, const std::string& stringToSearch,
-		const bool ignoreCase, const bool recursivelySearch, std::unordered_map<std::string, std::vector<uint32_t>>& foundStrings,
+	inline static void IsStringInFile(
+		const std::string& currentDir,
+		const std::string& fileToLookThrough,
+		const std::string& stringToSearch,
+		const bool ignoreCase,
+		const bool recursivelySearch,
+		std::unordered_map<std::string, std::vector<uint32_t>>& foundStrings,
 		StringSearchStatistics* pStatistics)
 	{
 		if (recursivelySearch)
@@ -237,8 +208,6 @@ namespace RDW_SS
 			threads.reserve(nrOfThreads);
 			std::mutex mutex{};
 
-			using FuncType = void(const std::vector<std::string>&, std::string, const bool, std::unordered_map<std::string, std::vector<uint32_t>>&, std::mutex&);
-
 			size_t nrOfFilesAdded{};
 			for (size_t i{}; i < nrOfThreads - 1; ++i)
 			{
@@ -253,11 +222,11 @@ namespace RDW_SS
 				}
 #endif
 
-				threads.emplace_back(static_cast<FuncType*>(&Detail::IsStringInFile), std::vector<std::string>{ allFiles.begin() + startOffset, allFiles.begin() + endOffset }, stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
+				threads.emplace_back(&Detail::SearchFilesForString, std::vector<std::string>{ allFiles.begin() + startOffset, allFiles.begin() + endOffset }, stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
 			}
 
-			threads.emplace_back(static_cast<FuncType*>(&Detail::IsStringInFile), std::vector<std::string>{ allFiles.begin() + nrOfFilesAdded, allFiles.end() }, stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
-			nrOfFilesAdded += std::distance(allFiles.begin() + nrOfFilesAdded, allFiles.end());
+			threads.emplace_back(&Detail::SearchFilesForString, std::vector<std::string>{ allFiles.begin() + nrOfFilesAdded, allFiles.end() }, stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
+			nrOfFilesAdded += allFiles.size() - nrOfFilesAdded;
 
 #ifdef _DEBUG
 			assert(nrOfFilesAdded == allFiles.size());
@@ -272,7 +241,8 @@ namespace RDW_SS
 		}
 		else
 		{
-			Detail::IsStringInFile(fileToLookThrough, stringToSearch, ignoreCase, foundStrings);
+			std::mutex mutex{};
+			Detail::SearchFilesForString(std::vector<std::string>{ fileToLookThrough }, stringToSearch, ignoreCase, foundStrings, mutex);
 		}
 	}
 
