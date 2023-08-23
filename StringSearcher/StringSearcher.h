@@ -125,7 +125,16 @@ namespace RDW_SS
 			return isExtensionValid;
 		}
 
-		inline static std::vector<std::string> GetAllFilesInDirectory(const std::string& rootDir, const std::string& filterFile)
+		inline static bool ShouldDirectoryBeConsidered(const std::string& rootDir, const std::string& currentDir, const uint32_t recursiveDepth)
+		{
+			if (recursiveDepth == 0) return true;
+
+			const int64_t depth{ std::count(currentDir.cbegin(), currentDir.cend(), '\\') - std::count(rootDir.cbegin(), rootDir.cend(), '\\') };
+
+			return depth <= recursiveDepth;
+		}
+
+		inline static std::vector<std::string> GetAllFilesInDirectory(const std::string& rootDir, const std::string& mask, const uint32_t recursiveDepth)
 		{
 			std::vector<std::string> files{};
 			files.reserve(80);
@@ -136,8 +145,8 @@ namespace RDW_SS
 			std::stack<std::string> fileStack{};
 			fileStack.push(rootDir);
 
-			const std::string filterFilename{ filterFile.substr(0, filterFile.find(".")) };
-			const std::string filterExtension{ filterFile.substr(filterFile.find(".")) };
+			const std::string filterFilename{ mask.empty() ? "*" : mask.substr(0, mask.find(".")) };
+			const std::string filterExtension{ mask.empty() ? "*" : mask.substr(mask.find(".")) };
 			const bool isWildcardName{ filterFilename == "*" };
 			const bool isWildcardExtension{ filterExtension == "*" };
 
@@ -163,7 +172,9 @@ namespace RDW_SS
 
 					if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 					{
-						fileStack.push(child + "\\" + findFileData.cFileName);
+						const std::string directoryName{ child + "\\" + findFileData.cFileName };
+
+						if (ShouldDirectoryBeConsidered(rootDir, directoryName, recursiveDepth)) fileStack.push(directoryName);
 					}
 					else
 					{
@@ -188,17 +199,22 @@ namespace RDW_SS
 
 	inline static void IsStringInFile(
 		const std::string& currentDir,
-		const std::string& fileToLookThrough,
+		const std::string& fileToSearch,
+		const std::string& mask,
 		const std::string& stringToSearch,
 		const bool ignoreCase,
 		const bool recursivelySearch,
+		const uint32_t recursiveDepth,
 		std::unordered_map<std::string, std::vector<uint32_t>>& foundStrings,
 		StringSearchStatistics* pStatistics)
 	{
 		if (recursivelySearch)
 		{
-			const size_t nrOfThreads{ std::thread::hardware_concurrency() };
-			const std::vector<std::string> allFiles{ Detail::GetAllFilesInDirectory(currentDir, fileToLookThrough) };
+			size_t nrOfThreads{ std::thread::hardware_concurrency() };
+			const std::vector<std::string> allFiles{ Detail::GetAllFilesInDirectory(currentDir, mask, recursiveDepth) };
+
+			if (nrOfThreads > allFiles.size()) nrOfThreads = allFiles.size();
+
 			const size_t nrOfFilesPerThread{ allFiles.size() / nrOfThreads };
 
 			if (nrOfFilesPerThread == 0) return;
@@ -242,18 +258,47 @@ namespace RDW_SS
 		else
 		{
 			std::mutex mutex{};
-			Detail::SearchFilesForString(std::vector<std::string>{ fileToLookThrough }, stringToSearch, ignoreCase, foundStrings, mutex);
+			Detail::SearchFilesForString(std::vector<std::string>{ fileToSearch }, stringToSearch, ignoreCase, foundStrings, mutex);
 		}
 	}
 
+	/*
+	command line format:
+		StringSearcher.exe [--recursive N | -r  N] [--ignorecase | -i] [--file <file> | -f <file>] <strings> <mask>
+
+		command line options :
+			--recursive [N]		search current directory and subdirectories, limited to N levels deep of sub directories. If N is not given or 0, this is unlimited
+			--ignorecase		ignore case of characters
+			--file				file to look through (required when --recursive or -r are not specified, but not available if -r or --recursive is specified)
+			-r					search current directory and subdirectories. Same as --recursive 0
+			-i					ignore case of characters
+			-f					file to look through (required when --recursive or -r are not specified, but not available if -r or --recursive is specified)
+
+		example:
+			D:\ExampleDir\> StringSearcher.exe -i --file hello_world.txt "Hello World"
+			D:\ExampleDir\> StringSearcher.exe --recursive 3 "Hello World"
+			D:\ExampleDir\> StringSearcher.exe --recursive -i Hello!
+	*/
+
 	inline static void PrintHelp()
 	{
+		std::cout << "Command Line Format:\n";
+		std::cout << "StringSearcher.exe [--recursive N | -r  N] [--ignorecase | -i] [--file <file> | -f <file>] <strings> <mask>\n\n";
+
 		std::cout << "command line options :\n";
-		std::cout << "/s	search current directory and subdirectories\n";
-		std::cout << "/i	ignore case of characters\n";
-		std::cout << "/c	string to search for (required)\n";
-		std::cout << "/f	files to look through (required if /s is not specified)\n";
-		std::cout << "Example: StringSearcher.exe /s /c Hello World! /f *.txt\n";
+		std::cout << "--recursive [N]		search current directory and subdirectories, limited to N levels deep of sub directories. If N is not given or 0, this is unlimited\n";
+		std::cout << "--ignorecase			ignore case of characters\n";
+		std::cout << "--file				file to look through (required when --recursive or -r are not specified)\n";
+		std::cout << "-r					search current directory and subdirectories. Same as --recursive 0\n";
+		std::cout << "-i					ignore case of characters\n";
+		std::cout << "-f					file to look through (required when --recursive or -r are not specified)\n\n";
+
+		std::cout << "Notes:\n";
+		std::cout << "The string to be searched must be between quotation marks if separated by spaces\n";
+		std::cout << "The mask is only applied when searching recursively, and accepts a wildcard token: *\n\n";
+
+		std::cout << "Example: StringSearcher.exe -i --file hello_world.txt \"Hello World\"\n";
+		std::cout << "Example: StringSearcher.exe --recursive 2 Hello! *.txt\n";
 	}
 }
 
