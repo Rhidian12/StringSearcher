@@ -1,3 +1,5 @@
+#pragma once
+
 #include <algorithm>
 #include <assert.h>
 #include <fstream>
@@ -9,9 +11,6 @@
 #include <unordered_map>
 #include <vector>
 #include <Windows.h>
-
-#ifndef RDW_STRINGSEARCHER_H // not every compiler supports #pragma once
-#define RDW_STRINGSEARCHER_H
 
 namespace RDW_SS
 {
@@ -301,5 +300,3 @@ namespace RDW_SS
 		std::cout << "Example: StringSearcher.exe --recursive 2 Hello! *.txt\n";
 	}
 }
-
-#endif // RDW_STRINGSEARCHER_H
