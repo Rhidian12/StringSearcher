@@ -7,6 +7,7 @@
 #include <mutex>
 #include <stack>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -18,10 +19,10 @@ namespace RDW_SS
 	{
 		inline static void TransformStringToLowercase(std::string& str)
 		{
-			std::transform(str.begin(), str.end(), str.begin(), [](char c) { return std::tolower(c); });
+			std::transform(str.begin(), str.end(), str.begin(), [](const char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
 		}
 
-		inline static void SearchFilesForString(
+		inline void SearchFilesForString(
 			const std::vector<std::string>& filesToLookThrough,
 			std::string stringToSearch,
 			const bool ignoreCase,
@@ -56,7 +57,7 @@ namespace RDW_SS
 
 					if (line.find(stringToSearch) != std::string::npos)
 					{
-						const std::lock_guard<std::mutex> lock{ mutex };
+						const std::scoped_lock<std::mutex> lock{ mutex };
 						foundStrings[filename].push_back(lineNumber);
 					}
 				}
@@ -65,72 +66,21 @@ namespace RDW_SS
 			}
 		}
 
-		inline static bool IsFilenameValid(char* pFilename, const std::string& filenameFilter)
+		inline bool IsFilenameValid(const std::string_view filename, const std::string_view filenameFilter)
 		{
 			if (filenameFilter == "*") return true;
 
-			bool isFilenameValid{ true };
-			for (size_t i{}; i < MAX_PATH; ++i)
-			{
-				if (pFilename[i] == '\0' || pFilename[i] == '.') break;
-
-				if (i >= filenameFilter.size())
-				{
-					isFilenameValid = false;
-					break;
-				}
-
-				if (pFilename[i] != filenameFilter[i])
-				{
-					isFilenameValid = false;
-					break;
-				}
-			}
-
-			return isFilenameValid;
+			return filename.find(filenameFilter) != std::string_view::npos;
 		}
 
-		inline static bool IsExtensionValid(char* pFilename, const std::string& extensionFilter)
+		inline bool IsExtensionValid(const std::string_view filename, const std::string_view extensionFilter)
 		{
 			if (extensionFilter == "*") return true;
 
-			{
-				bool hasExtension{};
-				for (size_t i{}; i < MAX_PATH; ++i)
-				{
-					if (*pFilename != '.') ++pFilename;
-					else
-					{
-						hasExtension = true;
-						break;
-					}
-				}
-
-				if (!hasExtension) return false;
-			}
-
-			bool isExtensionValid{ true };
-			for (size_t i{}; i < MAX_PATH; ++i)
-			{
-				if (pFilename[i] == '\0') break;
-
-				if (i >= extensionFilter.size())
-				{
-					isExtensionValid = false;
-					break;
-				}
-
-				if (pFilename[i] != extensionFilter[i])
-				{
-					isExtensionValid = false;
-					break;
-				}
-			}
-
-			return isExtensionValid;
+			return filename.find(extensionFilter) != std::string_view::npos;
 		}
 
-		inline static bool ShouldDirectoryBeConsidered(const std::string& rootDir, const std::string& currentDir, const uint32_t recursiveDepth)
+		inline bool ShouldDirectoryBeConsidered(const std::string& rootDir, const std::string& currentDir, const uint32_t recursiveDepth)
 		{
 			if (recursiveDepth == 0) return true;
 
@@ -139,7 +89,7 @@ namespace RDW_SS
 			return depth <= recursiveDepth;
 		}
 
-		inline static std::vector<std::string> GetAllFilesInDirectory(const std::string& rootDir, const std::string& mask, const uint32_t recursiveDepth)
+		inline std::vector<std::string> GetAllFilesInDirectory(const std::string& rootDir, const std::string& mask, const uint32_t recursiveDepth)
 		{
 			std::vector<std::string> files{};
 			files.reserve(80);
@@ -152,8 +102,6 @@ namespace RDW_SS
 
 			const std::string filterFilename{ mask.empty() ? "*" : mask.substr(0, mask.find(".")) };
 			const std::string filterExtension{ mask.empty() ? "*" : mask.substr(mask.find(".")) };
-			const bool isWildcardName{ filterFilename == "*" };
-			const bool isWildcardExtension{ filterExtension == "*" };
 
 			while (!fileStack.empty())
 			{
