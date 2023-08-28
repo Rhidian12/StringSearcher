@@ -4,8 +4,6 @@
 #include <filesystem>
 #include <string>
 
-#define PERFORMANCE_TESTS
-
 /*
 command line format:
 	StringSearcher.exe [--recursive N | -r  N] [--ignorecase | -i] [--file <file> | -f <file>] <strings> <mask>
@@ -117,17 +115,11 @@ namespace RDW_SS
 	}
 }
 
-#ifdef PERFORMANCE_TESTS
-int RunPerformanceTests(const int nrOfIterations, const std::string& directoryToSearch, const std::string& stringToSearch, const std::string& mask);
-#endif
+int RunCmdLine(int argc, char* argv[]);
 
 int main(int argc, char* argv[])
 {
-#ifdef PERFORMANCE_TESTS
-	return RunPerformanceTests(10, "D:\\000 Documents", "Hello_World!", "*.txt");
-#else
 	return RunCmdLine(argc, argv);
-#endif
 }
 
 int RunCmdLine(int argc, char* argv[])

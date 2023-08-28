@@ -40,13 +40,19 @@ namespace RDW_SS
 					return;
 				}
 
-				if (ignoreCase) TransformStringToLowercase(stringToSearch);
+				if (ignoreCase)
+				{
+					TransformStringToLowercase(stringToSearch);
+				}
 
 				// Notepad++ starts counting at 1, so let's do the same
 				std::string line{};
 				for (uint32_t lineNumber{ 1 }; std::getline(stream, line); ++lineNumber)
 				{
-					if (ignoreCase) TransformStringToLowercase(line);
+					if (ignoreCase)
+					{
+						TransformStringToLowercase(line);
+					}
 
 					if (line.find(stringToSearch) != std::string::npos)
 					{

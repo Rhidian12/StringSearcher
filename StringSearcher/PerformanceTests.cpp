@@ -53,9 +53,11 @@ int RunPerformanceTests(const int nrOfIterations, const std::string& directoryTo
 		}
 
 		{
+			const std::string stringSearcherCommand{ "cd " + directoryToSearch + " && StringSearcher.exe -r " + stringToSearch + " " + mask + " > nul" };
+
 			const Timepoint t1{ Timer::GetInstance().Now() };
 			std::unordered_map<std::string, std::vector<uint32_t>> foundStrings{};
-			IsStringInFile(directoryToSearch, "", mask, stringToSearch, false, true, 0, foundStrings, nullptr);
+			system(stringSearcherCommand.c_str());
 			const Timepoint t2{ Timer::GetInstance().Now() };
 
 			stringSearcherTimes.push_back((t2 - t1).Count<TimeLength::MilliSeconds, int>());
