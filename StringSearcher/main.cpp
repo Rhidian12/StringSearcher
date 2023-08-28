@@ -183,7 +183,7 @@ int RunCmdLine(int argc, char* argv[])
 	}
 	else
 	{
-		std::cout << "No occurences found!";
+		std::cout << "No occurences found!\n";
 	}
 
 	std::cout << "Finished in " << std::chrono::duration_cast<std::chrono::milliseconds>(clock::now() - start).count() << " milliseconds\n";

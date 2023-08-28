@@ -164,7 +164,14 @@ namespace RDW_SS
 				if (fileHandle == INVALID_HANDLE_VALUE)
 				{
 					std::cout << "FindFirstFile failed on file" << child << "\n";
-					return std::vector<std::string>{};
+					if (!fileStack.empty())
+					{
+						continue;
+					}
+					else
+					{
+						return files;
+					}
 				}
 
 				do
@@ -224,7 +231,6 @@ namespace RDW_SS
 
 			if (nrOfFilesPerThread == 0) return;
 
-			const bool evenNumberOfFiles{ allFiles.size() % nrOfThreads == 0 };
 			std::vector<std::thread> threads{};
 			threads.reserve(nrOfThreads);
 			std::mutex mutex{};
