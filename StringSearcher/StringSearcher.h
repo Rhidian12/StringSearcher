@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <assert.h>
 #include <fstream>
 #include <iostream>
 #include <mutex>
@@ -12,6 +11,16 @@
 #include <unordered_map>
 #include <vector>
 #include <Windows.h>
+
+#ifdef _DEBUG
+#define RDW_SS_ASSERT(expr) if (!(expr))	\
+							{	\
+								std::cout << "Assertion triggered at line: " << __LINE__ << " in file: " << __FILE__ << "\n";	\
+								__debugbreak();	\
+							}
+#else
+#define RDW_SS_ASSERT(expr)
+#endif
 
 namespace RDW_SS
 {
@@ -108,7 +117,8 @@ namespace RDW_SS
 				const std::string child{ fileStack.top() };
 				fileStack.pop();
 
-				fileHandle = FindFirstFileA((child + "\\*").c_str(), &findFileData);
+				const std::string rootWildcard{ child + "\\*" };
+				fileHandle = FindFirstFileA(rootWildcard.c_str(), &findFileData);
 				if (fileHandle == INVALID_HANDLE_VALUE)
 				{
 					std::cout << "FindFirstFile failed on file" << child << "\n";
@@ -179,7 +189,7 @@ namespace RDW_SS
 
 			if (nrOfFilesPerThread == 0) return;
 
-			std::vector<std::thread> threads{};
+			std::vector<std::jthread> threads{};
 			threads.reserve(nrOfThreads);
 			std::mutex mutex{};
 
@@ -190,24 +200,19 @@ namespace RDW_SS
 				const size_t endOffset{ nrOfFilesPerThread * (i + 1) };
 
 				nrOfFilesAdded += endOffset - startOffset;
-#ifdef _DEBUG
-				{ // destroys debug performance but we dont care lol
-					auto testFileSizes = std::vector<std::string>{ allFiles.begin() + startOffset, allFiles.begin() + endOffset };
-					assert(testFileSizes.size() == nrOfFilesPerThread);
-				}
-#endif
 
-				threads.emplace_back(&Detail::SearchFilesForString, std::vector<std::string>{ allFiles.begin() + startOffset, allFiles.begin() + endOffset }, stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
+				RDW_SS_ASSERT((endOffset - startOffset) == nrOfFilesPerThread);
+
+				threads.emplace_back(&Detail::SearchFilesForString, std::vector<std::string>{ allFiles.begin() + startOffset, allFiles.begin() + endOffset },
+					stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
 			}
 
-			threads.emplace_back(&Detail::SearchFilesForString, std::vector<std::string>{ allFiles.begin() + nrOfFilesAdded, allFiles.end() }, stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
+			threads.emplace_back(&Detail::SearchFilesForString, std::vector<std::string>{ allFiles.begin() + nrOfFilesAdded, allFiles.end() },
+				stringToSearch, ignoreCase, std::ref(foundStrings), std::ref(mutex));
+
 			nrOfFilesAdded += allFiles.size() - nrOfFilesAdded;
 
-#ifdef _DEBUG
-			assert(nrOfFilesAdded == allFiles.size());
-#endif
-
-			for (size_t i{}; i < nrOfThreads; ++i) threads[i].join();
+			RDW_SS_ASSERT(nrOfFilesAdded == allFiles.size());
 
 			if (pStatistics)
 			{
