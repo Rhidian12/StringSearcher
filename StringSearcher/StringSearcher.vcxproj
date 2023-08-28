@@ -132,7 +132,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="PerformanceTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="StringSearcher.h" />
